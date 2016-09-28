@@ -28,6 +28,10 @@
 #include <linux/msm-bus.h>
 #include <linux/pm_qos.h>
 
+#ifdef CONFIG_STATE_NOTIFIER
+#include <linux/state_notifier.h>
+#endif
+
 #include "mdss.h"
 #include "mdss_panel.h"
 #include "mdss_dsi.h"
@@ -2820,177 +2824,183 @@ static struct device_node *mdss_dsi_get_fb_node_cb(struct platform_device *pdev)
 static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	int event, void *arg)
 {
-    int rc = 0;
-    struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-    struct fb_info *fbi;
-    int power_state;
-    u32 mode;
-    struct mdss_panel_info *pinfo;
+	int rc = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct fb_info *fbi;
+	int power_state;
+	u32 mode;
+	struct mdss_panel_info *pinfo;
 
-    if (pdata == NULL) {
-	pr_err("%s: Invalid input data\n", __func__);
-	return -EINVAL;
-    }
-    pinfo = &pdata->panel_info;
-    ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-	    panel_data);
-    pr_debug("%s+: ctrl=%d event=%d\n", __func__, ctrl_pdata->ndx, event);
-
-    MDSS_XLOG(event, arg, ctrl_pdata->ndx, 0x3333);
-
-    switch (event) {
-    case MDSS_EVENT_UPDATE_PARAMS:
-	pr_debug("%s:Entered Case MDSS_EVENT_UPDATE_PARAMS\n",
-		__func__);
-	mdss_dsi_update_params(ctrl_pdata, arg);
-	break;
-    case MDSS_EVENT_CHECK_PARAMS:
-	pr_debug("%s:Entered Case MDSS_EVENT_CHECK_PARAMS\n", __func__);
-	if (mdss_dsi_check_params(ctrl_pdata, arg)) {
-	    ctrl_pdata->update_phy_timing = true;
-	    /*
-	     * Call to MDSS_EVENT_CHECK_PARAMS expects
-	     * the return value of 1, if there is a change
-	     * in panel timing parameters.
-	     */
-	    rc = 1;
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
 	}
-	ctrl_pdata->refresh_clk_rate = true;
-	break;
-    case MDSS_EVENT_LINK_READY:
-	if (ctrl_pdata->refresh_clk_rate)
-	    rc = mdss_dsi_clk_refresh(pdata,
-		    ctrl_pdata->update_phy_timing);
+	pinfo = &pdata->panel_info;
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+	pr_debug("%s+: ctrl=%d event=%d\n", __func__, ctrl_pdata->ndx, event);
 
-	rc = mdss_dsi_on(pdata);
-	mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode,
-		pdata);
-	break;
-    case MDSS_EVENT_UNBLANK:
-	pr_err("lcd-time event unblank begin\n");
-	if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
-	    rc = mdss_dsi_unblank(pdata);
-	pr_err("lcd-time event unblank end\n");
-	break;
-    case MDSS_EVENT_POST_PANEL_ON:
-	rc = mdss_dsi_post_panel_on(pdata);
-	break;
-    case MDSS_EVENT_PANEL_ON:
-	ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
-	if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
-	    rc = mdss_dsi_unblank(pdata);
-	pdata->panel_info.esd_rdy = true;
-	break;
-    case MDSS_EVENT_BLANK:
-	pr_err("lcd-time event blank begin\n");
-	power_state = (int) (unsigned long) arg;
-	if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE)
-	    rc = mdss_dsi_blank(pdata, power_state);
-	pr_err("lcd-time event blank end\n");
-	break;
-    case MDSS_EVENT_PANEL_OFF:
-	power_state = (int) (unsigned long) arg;
-	disable_esd_thread();
-	ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
-	if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
-	    rc = mdss_dsi_blank(pdata, power_state);
-	rc = mdss_dsi_off(pdata, power_state);
-	break;
-    case MDSS_EVENT_CONT_SPLASH_FINISH:
-	if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
-	    rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
-	ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
-	rc = mdss_dsi_cont_splash_on(pdata);
-	break;
-    case MDSS_EVENT_PANEL_CLK_CTRL:
-	mdss_dsi_clk_req(ctrl_pdata,
-		(struct dsi_panel_clk_ctrl *) arg);
-	break;
-    case MDSS_EVENT_DSI_CMDLIST_KOFF:
-	mdss_dsi_cmdlist_commit(ctrl_pdata, 1);
-	break;
-    case MDSS_EVENT_PANEL_UPDATE_FPS:
-	if (arg != NULL) {
-	    rc = mdss_dsi_dfps_config(pdata,
-		    (int) (unsigned long) arg);
-	    if (rc)
-		pr_err("unable to change fps-%d, error-%d\n",
-			(int) (unsigned long) arg, rc);
-	    else
-		pr_debug("panel frame rate changed to %d\n",
-			(int) (unsigned long) arg);
+	MDSS_XLOG(event, arg, ctrl_pdata->ndx, 0x3333);
+
+	switch (event) {
+	case MDSS_EVENT_UPDATE_PARAMS:
+		pr_debug("%s:Entered Case MDSS_EVENT_UPDATE_PARAMS\n",
+				__func__);
+		mdss_dsi_update_params(ctrl_pdata, arg);
+		break;
+	case MDSS_EVENT_CHECK_PARAMS:
+		pr_debug("%s:Entered Case MDSS_EVENT_CHECK_PARAMS\n", __func__);
+		if (mdss_dsi_check_params(ctrl_pdata, arg)) {
+			ctrl_pdata->update_phy_timing = true;
+			/*
+			 * Call to MDSS_EVENT_CHECK_PARAMS expects
+			 * the return value of 1, if there is a change
+			 * in panel timing parameters.
+			 */
+			rc = 1;
+		}
+		ctrl_pdata->refresh_clk_rate = true;
+		break;
+	case MDSS_EVENT_LINK_READY:
+		if (ctrl_pdata->refresh_clk_rate)
+			rc = mdss_dsi_clk_refresh(pdata,
+				ctrl_pdata->update_phy_timing);
+
+		rc = mdss_dsi_on(pdata);
+		mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode,
+							pdata);
+		break;
+	case MDSS_EVENT_UNBLANK:
+		pr_err("lcd-time event unblank begin\n");
+		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
+			rc = mdss_dsi_unblank(pdata);
+		pr_err("lcd-time event unblank end\n");
+		break;
+	case MDSS_EVENT_POST_PANEL_ON:
+		rc = mdss_dsi_post_panel_on(pdata);
+		break;
+	case MDSS_EVENT_PANEL_ON:
+		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
+		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
+			rc = mdss_dsi_unblank(pdata);
+		pdata->panel_info.esd_rdy = true;
+		#ifdef CONFIG_STATE_NOTIFIER
+		state_resume();
+		#endif
+		break;
+	case MDSS_EVENT_BLANK:
+		pr_err("lcd-time event blank begin\n");
+		power_state = (int) (unsigned long) arg;
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE)
+			rc = mdss_dsi_blank(pdata, power_state);
+		pr_err("lcd-time event blank end\n");
+		break;
+	case MDSS_EVENT_PANEL_OFF:
+		power_state = (int) (unsigned long) arg;
+		disable_esd_thread();
+		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
+		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
+			rc = mdss_dsi_blank(pdata, power_state);
+		rc = mdss_dsi_off(pdata, power_state);
+		#ifdef CONFIG_STATE_NOTIFIER
+		state_suspend();
+		#endif
+		break;
+	case MDSS_EVENT_CONT_SPLASH_FINISH:
+		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
+			rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
+		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
+		rc = mdss_dsi_cont_splash_on(pdata);
+		break;
+	case MDSS_EVENT_PANEL_CLK_CTRL:
+		mdss_dsi_clk_req(ctrl_pdata,
+			(struct dsi_panel_clk_ctrl *) arg);
+		break;
+	case MDSS_EVENT_DSI_CMDLIST_KOFF:
+		mdss_dsi_cmdlist_commit(ctrl_pdata, 1);
+		break;
+	case MDSS_EVENT_PANEL_UPDATE_FPS:
+		if (arg != NULL) {
+			rc = mdss_dsi_dfps_config(pdata,
+					 (int) (unsigned long) arg);
+			if (rc)
+				pr_err("unable to change fps-%d, error-%d\n",
+						(int) (unsigned long) arg, rc);
+			else
+				pr_debug("panel frame rate changed to %d\n",
+						(int) (unsigned long) arg);
+		}
+		break;
+	case MDSS_EVENT_CONT_SPLASH_BEGIN:
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE) {
+			/* Panel is Enabled in Bootloader */
+			rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
+		}
+		break;
+	case MDSS_EVENT_DSC_PPS_SEND:
+		if (pinfo->compression_mode == COMPRESSION_DSC)
+			mdss_dsi_panel_dsc_pps_send(ctrl_pdata, pinfo);
+		break;
+	case MDSS_EVENT_ENABLE_PARTIAL_ROI:
+		rc = mdss_dsi_ctl_partial_roi(pdata);
+		break;
+	case MDSS_EVENT_DSI_RESET_WRITE_PTR:
+		rc = mdss_dsi_reset_write_ptr(pdata);
+		break;
+	case MDSS_EVENT_DSI_STREAM_SIZE:
+		rc = mdss_dsi_set_stream_size(pdata);
+		break;
+	case MDSS_EVENT_DSI_UPDATE_PANEL_DATA:
+		rc = mdss_dsi_update_panel_config(ctrl_pdata,
+					(int)(unsigned long) arg);
+		break;
+	case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
+		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
+			(struct mdss_intf_recovery *)arg);
+		break;
+	case MDSS_EVENT_REGISTER_MDP_CALLBACK:
+		rc = mdss_dsi_register_mdp_callback(ctrl_pdata,
+			(struct mdss_intf_recovery *)arg);
+		break;
+	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
+		mode = (u32)(unsigned long) arg;
+		mdss_dsi_switch_mode(pdata, mode);
+		break;
+	case MDSS_EVENT_DSI_RECONFIG_CMD:
+		mode = (u32)(unsigned long) arg;
+		rc = mdss_dsi_reconfig(pdata, mode);
+		break;
+	case MDSS_EVENT_DSI_PANEL_STATUS:
+		if (ctrl_pdata->check_status)
+			rc = ctrl_pdata->check_status(ctrl_pdata);
+		else
+			rc = true;
+		break;
+	case MDSS_EVENT_PANEL_TIMING_SWITCH:
+		rc = mdss_dsi_panel_timing_switch(ctrl_pdata, arg);
+		break;
+	case MDSS_EVENT_FB_REGISTERED:
+		mdss_dsi_debugfs_init(ctrl_pdata);
+
+		fbi = (struct fb_info *)arg;
+		if (!fbi || !fbi->dev)
+			break;
+
+		ctrl_pdata->kobj = &fbi->dev->kobj;
+		ctrl_pdata->fb_node = fbi->node;
+
+		if (IS_ENABLED(CONFIG_MSM_DBA) &&
+			pdata->panel_info.is_dba_panel) {
+				queue_delayed_work(ctrl_pdata->workq,
+					&ctrl_pdata->dba_work, HZ);
+		}
+		break;
+	default:
+		pr_debug("%s: unhandled event=%d\n", __func__, event);
+		break;
 	}
-	break;
-    case MDSS_EVENT_CONT_SPLASH_BEGIN:
-	if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE) {
-	    /* Panel is Enabled in Bootloader */
-	    rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
-	}
-	break;
-    case MDSS_EVENT_DSC_PPS_SEND:
-	if (pinfo->compression_mode == COMPRESSION_DSC)
-	    mdss_dsi_panel_dsc_pps_send(ctrl_pdata, pinfo);
-	break;
-    case MDSS_EVENT_ENABLE_PARTIAL_ROI:
-	rc = mdss_dsi_ctl_partial_roi(pdata);
-	break;
-    case MDSS_EVENT_DSI_RESET_WRITE_PTR:
-	rc = mdss_dsi_reset_write_ptr(pdata);
-	break;
-    case MDSS_EVENT_DSI_STREAM_SIZE:
-	rc = mdss_dsi_set_stream_size(pdata);
-	break;
-    case MDSS_EVENT_DSI_UPDATE_PANEL_DATA:
-	rc = mdss_dsi_update_panel_config(ctrl_pdata,
-		(int)(unsigned long) arg);
-	break;
-    case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
-	rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
-		(struct mdss_intf_recovery *)arg);
-	break;
-    case MDSS_EVENT_REGISTER_MDP_CALLBACK:
-	rc = mdss_dsi_register_mdp_callback(ctrl_pdata,
-		(struct mdss_intf_recovery *)arg);
-	break;
-    case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
-	mode = (u32)(unsigned long) arg;
-	mdss_dsi_switch_mode(pdata, mode);
-	break;
-    case MDSS_EVENT_DSI_RECONFIG_CMD:
-	mode = (u32)(unsigned long) arg;
-	rc = mdss_dsi_reconfig(pdata, mode);
-	break;
-    case MDSS_EVENT_DSI_PANEL_STATUS:
-	if (ctrl_pdata->check_status)
-	    rc = ctrl_pdata->check_status(ctrl_pdata);
-	else
-	    rc = true;
-	break;
-    case MDSS_EVENT_PANEL_TIMING_SWITCH:
-	rc = mdss_dsi_panel_timing_switch(ctrl_pdata, arg);
-	break;
-    case MDSS_EVENT_FB_REGISTERED:
-	mdss_dsi_debugfs_init(ctrl_pdata);
-
-	fbi = (struct fb_info *)arg;
-	if (!fbi || !fbi->dev)
-	    break;
-
-	ctrl_pdata->kobj = &fbi->dev->kobj;
-	ctrl_pdata->fb_node = fbi->node;
-
-	if (IS_ENABLED(CONFIG_MSM_DBA) &&
-		pdata->panel_info.is_dba_panel) {
-	    queue_delayed_work(ctrl_pdata->workq,
-		    &ctrl_pdata->dba_work, HZ);
-	}
-	break;
-    default:
-	pr_debug("%s: unhandled event=%d\n", __func__, event);
-	break;
-    }
-    pr_debug("%s-:event=%d, rc=%d\n", __func__, event, rc);
-    return rc;
+	pr_debug("%s-:event=%d, rc=%d\n", __func__, event, rc);
+	return rc;
 }
 
 static int mdss_dsi_set_override_cfg(char *override_cfg,
