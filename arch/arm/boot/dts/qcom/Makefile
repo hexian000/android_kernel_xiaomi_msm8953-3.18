@@ -238,21 +238,18 @@ dtb-$(CONFIG_ARCH_MSM8940) += msm8940-pmi8937-cdp.dtb \
 	msm8940-pmi8940-rcm.dtb \
 	msm8940-pmi8940-qrd-sku7.dtb
 
-ifeq ($(TARGET_PRODUCT),tiffany)
-$(info Using msm8953-qrd-sku3-tiffany.dtb)
-dtb-$(CONFIG_ARCH_MSM8953) += msm8953-qrd-sku3-tiffany.dtb
+ifeq ($(CONFIG_MACH_XIAOMI_MSM8953),y)
+dtb-$(CONFIG_MACH_XIAOMI_SAKURA) += msm8953-qrd-sku3.dtb \
+        	msm8953-qrd-sku3-daisy.dtb
+dtb-$(CONFIG_MACH_XIAOMI_TIFFANY) += msm8953-qrd-sku3-tiffany.dtb
+dtb-$(CONFIG_MACH_XIAOMI_VINCE) += msm8953-qrd-sku3.dtb \
+	msm8953-qrd-sku3-e7.dtb
 else
-$(info Using msm8953-qrd-sku3.dtb)
-dtb-$(CONFIG_ARCH_MSM8953) += msm8953-qrd-sku3.dtb
-endif
-
 dtb-$(CONFIG_ARCH_MSM8953) += msm8953-sim.dtb \
 	msm8953-rumi.dtb \
 	msm8953-cdp.dtb \
 	msm8953-mtp.dtb \
 	msm8953-ext-codec-mtp.dtb \
-	msm8953-qrd-sku3-e7.dtb \
-	msm8953-qrd-sku3-daisy.dtb \
 	msm8953-rcm.dtb \
 	apq8053-rcm.dtb \
 	msm8953-ext-codec-rcm.dtb \
@@ -274,6 +271,7 @@ dtb-$(CONFIG_ARCH_MSM8953) += msm8953-sim.dtb \
 	msm8953-pmi8937-mtp.dtb \
 	msm8953-pmi8940-ext-codec-mtp.dtb \
 	msm8953-pmi8937-ext-codec-mtp.dtb
+endif
 
 dtb-$(CONFIG_ARCH_SDM450) += sdm450-rcm.dtb \
 	sdm450-cdp.dtb \
