@@ -623,13 +623,40 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
 KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= -Os
 else
 KBUILD_CFLAGS	+= -O2
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+
+# Optimize yet more
+KBUILD_CFLAGS += $(call cc-option,-ftree-vectorize)
+KBUILD_CFLAGS += $(call cc-option,-fvect-cost-model=unlimited)
+KBUILD_CFLAGS += $(call cc-option,-fgcse-after-reload)
+KBUILD_CFLAGS += $(call cc-option,-funswitch-loops)
+KBUILD_CFLAGS += $(call cc-option,-floop-interchange)
+KBUILD_CFLAGS += $(call cc-option,-fgraphite-identity)
+KBUILD_CFLAGS += $(call cc-option,-fpredictive-commoning)
+
+# Needed to unbreak GCC 7.x and above
+KBUILD_CFLAGS += $(call cc-option,-fno-store-merging)
+
+# TODO: Remove me
+KBUILD_CFLAGS += $(call cc-disable-warning,maybe-uninitialized)
+KBUILD_CFLAGS += $(call cc-disable-warning,duplicate-decl-specifier)
+KBUILD_CFLAGS += $(call cc-disable-warning,misleading-indentation)
+KBUILD_CFLAGS += $(call cc-disable-warning,stringop-overflow)
+KBUILD_CFLAGS += $(call cc-disable-warning,bool-operation)
+KBUILD_CFLAGS += $(call cc-disable-warning,bool-compare)
+KBUILD_CFLAGS += $(call cc-disable-warning,logical-not-parentheses)
+KBUILD_CFLAGS += $(call cc-disable-warning,memset-elt-size)
+KBUILD_CFLAGS += $(call cc-disable-warning,parentheses)
+KBUILD_CFLAGS += $(call cc-disable-warning,switch-unreachable)
+KBUILD_CFLAGS += $(call cc-disable-warning,array-bounds)
+KBUILD_CFLAGS += $(call cc-disable-warning,unused-but-set-variable)
+KBUILD_CFLAGS += $(call cc-disable-warning,memset-transposed-args)
 
 ifdef CONFIG_READABLE_ASM
 # Disable optimizations that make assembler listings hard to read.
